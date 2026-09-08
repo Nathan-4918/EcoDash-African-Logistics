@@ -1,12 +1,53 @@
 body {
   margin: 0;
+  padding: 0;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: #1a1a1a;
+  background-color: #0d0d0d;
+  font-family: 'Calibri', sans-serif;
+  user-select: none;
 }
+
+/* Wrapper so the HUD can sit positioned relative to the canvas, not the whole page */
+#gameContainer {
+  position: relative;
+}
+
 #gameCanvas {
-  border: 2px solid #ffffff;
-  background: #333;
+  display: block;
+  /* Fixed size matches the width/height set in JS - stops blurring/stretching */
+  width: 800px;
+  height: 500px;
+  background: linear-gradient(to bottom, #f39c12, #d35400, #2c3e50); /* dusk-over-savannah gradient */
+  border: 2px solid #f39c12;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+#hud {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+.hud-card {
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid #f39c12;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  font-size: 15px;
+}
+
+/* Turns the battery HUD red when low - small visual polish */
+.hud-card.low-battery {
+  border-color: #e74c3c;
+  color: #e74c3c;
 }

@@ -2,11 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>EcoDash — African Digital Logistics Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoDash: Load-Shedding Logistics Simulator</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div id="gameContainer">
+    <div id="hud">
+      <div class="hud-card">Battery: <span id="battery">100</span>%</div>
+      <div class="hud-card">Distance: <span id="distance">0</span>m</div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+  </div>
+
+  <!-- Fixed: was pointing to game.js which doesn't exist -->
   <script src="js/main.js"></script>
 </body>
 </html>
