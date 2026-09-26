@@ -12,10 +12,29 @@
       <div class="hud-card">Battery: <span id="battery">100</span>%</div>
       <div class="hud-card">Distance: <span id="distance">0</span>m</div>
     </div>
+
+    <div id="startScreen" class="screen">
+  <h1>EcoDash</h1>
+  <p>High Score: <span id="highScoreDisplay">0</span>m</p>
+  <button id="startBtn">Start Delivery</button>
+</div>
+
+<div id="pauseScreen" class="screen hidden">
+  <h2>Paused</h2>
+  <button id="resumeBtn">Resume</button>
+</div>
+
+<div id="gameOverScreen" class="screen hidden">
+  <h2>Battery Depleted</h2>
+  <p>Distance: <span id="finalDistance">0</span>m</p>
+  <p>Efficiency: <span id="finalEfficiency">0</span></p>
+  <p>High Score: <span id="finalHighScore">0</span>m</p>
+  <button id="restartBtn">Try Again</button>
+</div>
     <canvas id="gameCanvas" width="800" height="500"></canvas>
   </div>
 
-  <!-- Fixed: was pointing to game.js which doesn't exist -->
+  
   <script src="js/main.js"></script>
 </body>
 </html>

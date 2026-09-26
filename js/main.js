@@ -12,6 +12,69 @@ let lastTime = 0;
 let distanceTravelled = 0;
 
 // ==========================
+// Game state & scoring
+// ==========================
+let gameState = 'start'; // 'start', 'playing', 'paused', 'gameover'
+let totalEnergyUsed = 0; // tracks drain only, not recharge - used for efficiency
+
+let highScore = localStorage.getItem('ecoDashHighScore');
+highScore = highScore ? parseInt(highScore) : 0;
+
+const startScreen = document.getElementById('startScreen');
+const pauseScreen = document.getElementById('pauseScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+
+document.getElementById('highScoreDisplay').textContent = highScore;
+
+function startGame() {
+  gameState = 'playing';
+  startScreen.classList.add('hidden');
+}
+
+function pauseGame() {
+  gameState = 'paused';
+  pauseScreen.classList.remove('hidden');
+}
+
+function resumeGame() {
+  gameState = 'playing';
+  pauseScreen.classList.add('hidden');
+}
+
+function endGame() {
+  gameState = 'gameover';
+
+  if (distanceTravelled > highScore) {
+    highScore = Math.floor(distanceTravelled);
+    localStorage.setItem('ecoDashHighScore', highScore);
+  }
+
+  const efficiency = totalEnergyUsed > 0
+    ? (distanceTravelled / totalEnergyUsed).toFixed(2)
+    : '0.00';
+
+  document.getElementById('finalDistance').textContent = Math.floor(distanceTravelled);
+  document.getElementById('finalEfficiency').textContent = efficiency;
+  document.getElementById('finalHighScore').textContent = highScore;
+  gameOverScreen.classList.remove('hidden');
+}
+
+function restartGame() {
+  drone.x = 100;
+  drone.y = 250;
+  drone.angle = 0;
+  drone.batteryLevel = 100;
+
+  distanceTravelled = 0;
+  totalEnergyUsed = 0;
+
+  obstacles = generateObstacles();
+
+  gameOverScreen.classList.add('hidden');
+  gameState = 'playing';
+}
+
+// ==========================
 // Vehicle Class (the player)
 // ==========================
 class Vehicle {
@@ -49,10 +112,12 @@ if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier
 
     // Track distance travelled (for the score system later)
     if (this.speed > 0) {
-      distanceTravelled += Math.sqrt(moveX * moveX + moveY * moveY);
-      this.batteryLevel -= this.drainRate * deltaTime;
-      this.batteryLevel = Math.max(0, this.batteryLevel);
-    }
+  distanceTravelled += Math.sqrt(moveX * moveX + moveY * moveY);
+  const drain = this.drainRate * deltaTime;
+  this.batteryLevel -= drain;
+  this.batteryLevel = Math.max(0, this.batteryLevel);
+  totalEnergyUsed += drain; // NEW - tracks total drain for efficiency score
+}
 
     // Keep the drone inside the canvas
     this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
@@ -148,12 +213,25 @@ function isCollidingWithBuilding(circle, rect){
 // ==========================
 // Obstacles, Buildings & Load-shedding
 // ==========================
-const obstacles = [
-  new Obstacle(300, 150, 25, 'windGust'),
-  new Obstacle(500, 350, 30, 'noFlyZone'),
-  new Obstacle(200, 380, 28, 'signalDeadZone'),
-  new Obstacle(650, 100, 20, 'chargingStation')
-];
+function generateObstacles() {
+  const types = ['windGust', 'noFlyZone', 'signalDeadZone'];
+  const generated = [];
+
+  types.forEach(type => {
+    generated.push(new Obstacle(
+      Math.random() * (canvas.width - 100) + 50,
+      Math.random() * (canvas.height - 100) + 50,
+      Math.random() * 15 + 20,
+      type
+    ));
+  });
+
+  generated.push(new Obstacle(650, 100, 20, 'chargingStation'));
+
+  return generated;
+}
+
+let obstacles = generateObstacles();
 
 const buildings = [
   new Building(400, 200, 60, 150),
@@ -171,6 +249,17 @@ const loadSheddingCycle = 8; // seconds on/off for charging station
 const keysPressed = {};
 window.addEventListener('keydown', (e) => keysPressed[e.key] = true);
 window.addEventListener('keyup', (e) => keysPressed[e.key] = false);
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('resumeBtn').addEventListener('click', resumeGame);
+document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'p' || e.key === 'P') {
+    if (gameState === 'playing') pauseGame();
+    else if (gameState === 'paused') resumeGame();
+  }
+});
 
 // ==========================
 // Game objects
@@ -232,6 +321,9 @@ function update(deltaTime) {
       drone.y = drone.prevY;
     }
   });
+  if (drone.batteryLevel <= 0 && gameState === 'playing') {
+    endGame();
+  }
 }
 
 function render() {
