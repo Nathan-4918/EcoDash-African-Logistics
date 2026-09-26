@@ -16,8 +16,7 @@ let distanceTravelled = 0;
 // ==========================
 class Vehicle {
   constructor(x, y) {
-    this.prevX = this.x;
-    this.prevY = this.y;
+
     this.x = x;
     this.y = y;
     this.radius = 15;
@@ -28,10 +27,12 @@ class Vehicle {
     this.drainRate = 5;       // % per second while moving
   }
 
-  update(deltaTime, keysPressed) {
+  update(deltaTime, keysPressed, controlMultiplier = 1) {
+     this.prevX = this.x;
+     this.prevY = this.y;
     // Rotate left/right
-    if (keysPressed['ArrowLeft']) this.angle -= 2.5 * deltaTime;
-    if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime;
+    if (keysPressed['ArrowLeft']) this.angle -= 2.5 * deltaTime * controlMultiplier;
+if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier;
 
     // Accelerate forward, only if there's battery left
     if (keysPressed['ArrowUp'] && this.batteryLevel > 0) {
@@ -117,7 +118,7 @@ class Building {
     context.fillStyle = '#4a4a4a';
     context.fillRect(this.x, this.y, this.width, this.height);
     context.strokeStyle = '#2c2c2c';
-    context.fillStrokeRect(this.x, this.y, this.width, this.height);
+    context.strokeRect(this.x, this.y, this.width, this.height);
   }
 }
 
@@ -237,6 +238,9 @@ function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   drone.draw(ctx);
+
+  buildings.forEach(building => building.draw(ctx));
+  obstacles.forEach(obstacle => obstacle.draw(ctx));
 
   // Sync the HTML HUD (not drawn on canvas - cleaner separation)
   batteryDisplay.textContent = Math.floor(drone.batteryLevel);
