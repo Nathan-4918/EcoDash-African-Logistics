@@ -16,6 +16,8 @@ let distanceTravelled = 0;
 // ==========================
 class Vehicle {
   constructor(x, y) {
+    this.prevX = this.x;
+    this.prevY = this.y;
     this.x = x;
     this.y = y;
     this.radius = 15;
@@ -70,6 +72,97 @@ class Vehicle {
     context.restore();
   }
 }
+
+// ==========================
+// Circular Obstacle Class
+// ==========================
+class Obstacle {
+  constructor(x, y, radius, type){
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+   this.type = type;          // 'windGust', 'noFlyZone', 'signalDeadZone', 'chargingStation'
+    this.active = true;        // used by chargingStation for load-shedding
+    this.windAngle = Math.random() * Math.PI * 2; // direction wind pushes, if this is a windGust
+  }
+
+
+  draw(context) {
+    context.beginPath();
+    context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+
+    if (this.type === 'windGust') context.fillStyle = 'rgba(174, 214, 241, 0.5)';
+    if (this.type === 'noFlyZone') context.fillStyle = 'rgba(231, 76, 60, 0.4)';
+    if (this.type === 'signalDeadZone') context.fillStyle = 'rgba(155, 89, 182, 0.4)';
+    if (this.type === 'chargingStation') context.fillStyle = this.active ? '#27ae60' : '#7f8c8d';
+
+    context.fill();
+
+    }
+  }
+
+  // ==========================
+// Building Class (solid, rectangular)
+// ==========================
+
+class Building {
+  constructor (x, y, width, height){
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+  }
+
+  draw(context){
+    context.fillStyle = '#4a4a4a';
+    context.fillRect(this.x, this.y, this.width, this.height);
+    context.strokeStyle = '#2c2c2c';
+    context.fillStrokeRect(this.x, this.y, this.width, this.height);
+  }
+}
+
+// ==========================
+// Collision detection
+// ==========================
+
+// Circle vs circle (drone vs wind/no-fly/dead-zone/charging station)
+function isColliding(a, b){
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return distance < a.radius + b.radius;
+}
+
+// Circle vs rectangle (drone vs building) - AABB-style check
+function isCollidingWithBuilding(circle, rect){
+  const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
+  const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
+
+  const dx = circle.x - closestX;
+  const dy = circle.y - closestY;
+
+  return (dx * dx + dy * dy) < (circle.radius * circle.radius);
+}
+
+// ==========================
+// Obstacles, Buildings & Load-shedding
+// ==========================
+const obstacles = [
+  new Obstacle(300, 150, 25, 'windGust'),
+  new Obstacle(500, 350, 30, 'noFlyZone'),
+  new Obstacle(200, 380, 28, 'signalDeadZone'),
+  new Obstacle(650, 100, 20, 'chargingStation')
+];
+
+const buildings = [
+  new Building(400, 200, 60, 150),
+  new Building(150, 500, 70, 90),
+  new Building(600, 200, 100, 150),
+  new Building(700, 450, 55, 110)
+];
+
+let loadSheddingTimer = 0;
+const loadSheddingCycle = 8; // seconds on/off for charging station
 
 // ==========================
 // Input tracking
