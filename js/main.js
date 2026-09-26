@@ -191,7 +191,46 @@ function gameLoop(timestamp) {
 }
 
 function update(deltaTime) {
-  drone.update(deltaTime, keysPressed);
+  // Check if drone is currently inside a signal dead zone (affects control before moving)
+  let controlMultiplier = 1;
+  obstacles.forEach(obstacle => {
+    if (obstacle.type === 'signalDeadZone' && isColliding(drone, obstacle)) {
+      controlMultiplier = 0.3; // rotation becomes sluggish
+    }
+  });
+
+  drone.update(deltaTime, keysPressed, controlMultiplier);
+
+  // Load-shedding cycle
+  loadSheddingTimer += deltaTime;
+  if (loadSheddingTimer >= loadSheddingCycle) {
+    loadSheddingTimer = 0;
+    obstacles.forEach(obstacle => {
+      if (obstacle.type === 'chargingStation') obstacle.active = !obstacle.active;
+    });
+  }
+
+  // Handle each obstacle type
+  obstacles.forEach(obstacle => {
+    if (!isColliding(drone, obstacle)) return;
+
+    if (obstacle.type === 'windGust') {
+      drone.x += Math.cos(obstacle.windAngle) * 40 * deltaTime;
+      drone.y += Math.sin(obstacle.windAngle) * 40 * deltaTime;
+    } else if (obstacle.type === 'noFlyZone') {
+      drone.batteryLevel = Math.max(0, drone.batteryLevel - 10 * deltaTime); // penalty for restricted airspace
+    } else if (obstacle.type === 'chargingStation' && obstacle.active) {
+      drone.batteryLevel = Math.min(100, drone.batteryLevel + 20 * deltaTime);
+    }
+  });
+
+  // Buildings block movement entirely
+  buildings.forEach(building => {
+    if (isCollidingWithBuilding(drone, building)) {
+      drone.x = drone.prevX;
+      drone.y = drone.prevY;
+    }
+  });
 }
 
 function render() {
