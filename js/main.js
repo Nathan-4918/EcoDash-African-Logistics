@@ -29,16 +29,19 @@ document.getElementById('highScoreDisplay').textContent = highScore;
 function startGame() {
   gameState = 'playing';
   startScreen.classList.add('hidden');
+  bgMusic.play();
 }
 
 function pauseGame() {
   gameState = 'paused';
   pauseScreen.classList.remove('hidden');
+  bgMusic.pause();
 }
 
 function resumeGame() {
   gameState = 'playing';
   pauseScreen.classList.add('hidden');
+  bgMusic.play();
 }
 
 function endGame() {
@@ -56,6 +59,7 @@ function endGame() {
   document.getElementById('finalDistance').textContent = Math.floor(distanceTravelled);
   document.getElementById('finalEfficiency').textContent = efficiency;
   document.getElementById('finalHighScore').textContent = highScore;
+  document.getElementById('finalDeliveries').textContent = deliveriesCompleted;
   gameOverScreen.classList.remove('hidden');
 }
 
@@ -67,7 +71,9 @@ function restartGame() {
 
   distanceTravelled = 0;
   totalEnergyUsed = 0;
-
+  deliveriesCompleted = 0;
+  
+  deliveryTarget = generateDeliveryTarget();
   obstacles = generateObstacles();
 
   gameOverScreen.classList.add('hidden');
@@ -142,49 +148,199 @@ if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier
 // ==========================
 // Circular Obstacle Class
 // ==========================
+
 class Obstacle {
-  constructor(x, y, radius, type){
+  constructor(x, y, radius, type) {
     this.x = x;
     this.y = y;
     this.radius = radius;
-   this.type = type;          // 'windGust', 'noFlyZone', 'signalDeadZone', 'chargingStation'
-    this.active = true;        // used by chargingStation for load-shedding
-    this.windAngle = Math.random() * Math.PI * 2; // direction wind pushes, if this is a windGust
+    this.type = type;
+    this.active = true;
+    this.windAngle = Math.random() * Math.PI * 2;
   }
-
 
   draw(context) {
     context.beginPath();
     context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
 
-    if (this.type === 'windGust') context.fillStyle = 'rgba(174, 214, 241, 0.5)';
-    if (this.type === 'noFlyZone') context.fillStyle = 'rgba(231, 76, 60, 0.4)';
-    if (this.type === 'signalDeadZone') context.fillStyle = 'rgba(155, 89, 182, 0.4)';
-    if (this.type === 'chargingStation') context.fillStyle = this.active ? '#27ae60' : '#7f8c8d';
+    let label = '';
+    if (this.type === 'windGust') {
+      context.fillStyle = 'rgba(174, 214, 241, 0.5)';
+      label = 'WIND';
+    } else if (this.type === 'noFlyZone') {
+      context.fillStyle = 'rgba(231, 76, 60, 0.45)';
+      label = 'NO-FLY';
+    } else if (this.type === 'signalDeadZone') {
+      context.fillStyle = 'rgba(155, 89, 182, 0.45)';
+      label = 'NO SIGNAL';
+    } else if (this.type === 'chargingStation') {
+      context.fillStyle = this.active ? '#27ae60' : '#7f8c8d';
+      label = this.active ? 'CHARGE' : 'OFFLINE';
+    }
 
     context.fill();
+    context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    context.lineWidth = 2;
+    context.stroke();
 
-    }
+    // Label text, centered
+    context.fillStyle = '#1a1a1a';
+    context.font = 'bold 12px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(label, this.x, this.y);
   }
+}
+
+// ==========================
+// Delivery Target (the mission objective)
+// ==========================
+class DeliveryTarget {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 20;
+  }
+
+  draw(context) {
+    context.beginPath();
+    context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(241, 196, 15, 0.9)';
+    context.fill();
+    context.strokeStyle = '#1a1a1a';
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.fillStyle = '#1a1a1a';
+    context.font = 'bold 10px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText('DELIVERY', this.x, this.y);
+  }
+}
 
   // ==========================
 // Building Class (solid, rectangular)
 // ==========================
-
 class Building {
-  constructor (x, y, width, height){
+  constructor(x, y, width, height, roofColor) {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
+    this.roofColor = roofColor || '#c0392b'; // default roof colour, can vary per building
   }
 
-  draw(context){
-    context.fillStyle = '#4a4a4a';
+  draw(context) {
+    // Walls
+    context.fillStyle = '#7f8c8d';
     context.fillRect(this.x, this.y, this.width, this.height);
     context.strokeStyle = '#2c2c2c';
     context.strokeRect(this.x, this.y, this.width, this.height);
+
+    // Roof strip along the top
+    context.fillStyle = this.roofColor;
+    context.fillRect(this.x, this.y, this.width, 10);
+
+    // Windows - simple grid of small squares
+    context.fillStyle = 'rgba(255, 240, 150, 0.8)';
+    const windowSize = 8;
+    const gap = 14;
+    for (let wx = this.x + 8; wx < this.x + this.width - 8; wx += gap) {
+      for (let wy = this.y + 20; wy < this.y + this.height - 10; wy += gap) {
+        context.fillRect(wx, wy, windowSize, windowSize);
+      }
+    }
   }
+}
+
+// ==========================
+// House Class (small, decorative only - no collision)
+// ==========================
+class House {
+  constructor(x, y, size, roofColor) {
+    this.x = x;
+    this.y = y;
+    this.size = size;
+    this.roofColor = roofColor || '#c0392b';
+  }
+
+  draw(context) {
+    const s = this.size;
+
+    // Walls
+    context.fillStyle = '#d8c9a3';
+    context.fillRect(this.x, this.y + s * 0.4, s, s * 0.6);
+    context.strokeStyle = '#2c2c2c';
+    context.strokeRect(this.x, this.y + s * 0.4, s, s * 0.6);
+
+    // Triangular roof
+    context.fillStyle = this.roofColor;
+    context.beginPath();
+    context.moveTo(this.x - s * 0.1, this.y + s * 0.4);
+    context.lineTo(this.x + s / 2, this.y);
+    context.lineTo(this.x + s * 1.1, this.y + s * 0.4);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    // Door
+    context.fillStyle = '#5c3a21';
+    context.fillRect(this.x + s * 0.4, this.y + s * 0.75, s * 0.2, s * 0.25);
+  }
+}
+
+// ==========================
+// Decorative trees (visual only - no collision)
+// ==========================
+function drawTree(context, x, y) {
+  context.fillStyle = '#5c3a21'; // trunk
+  context.fillRect(x - 3, y, 6, 14);
+
+  context.fillStyle = '#2e6b3e'; // leaves
+  context.beginPath();
+  context.arc(x, y - 4, 12, 0, Math.PI * 2);
+  context.fill();
+}
+
+const treePositions = [
+  [70, 120], [200, 100], [350, 90], [600, 110], [750, 90],
+  [90, 300], [470, 270], [740, 300],
+  [100, 460], [350, 440], [600, 460], [770, 450],
+];
+
+function drawRoads(context) {
+  const roadWidth = 30;
+  const horizontalRoads = [170, 350];
+  const verticalRoads = [270, 530];
+
+  context.fillStyle = '#0d0d0d'; // black asphalt
+
+  horizontalRoads.forEach(y => {
+    context.fillRect(0, y - roadWidth / 2, canvas.width, roadWidth);
+  });
+  verticalRoads.forEach(x => {
+    context.fillRect(x - roadWidth / 2, 0, roadWidth, canvas.height);
+  });
+
+  context.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  context.lineWidth = 2;
+  context.setLineDash([12, 10]);
+
+  horizontalRoads.forEach(y => {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(canvas.width, y);
+    context.stroke();
+  });
+  verticalRoads.forEach(x => {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, canvas.height);
+    context.stroke();
+  });
+
+  context.setLineDash([]);
 }
 
 // ==========================
@@ -221,12 +377,12 @@ function generateObstacles() {
     generated.push(new Obstacle(
       Math.random() * (canvas.width - 100) + 50,
       Math.random() * (canvas.height - 100) + 50,
-      Math.random() * 15 + 20,
+      Math.random() * 15 + 80,
       type
     ));
   });
 
-  generated.push(new Obstacle(650, 100, 20, 'chargingStation'));
+  generated.push(new Obstacle(140, 260, 45, 'chargingStation'));
 
   return generated;
 }
@@ -234,14 +390,39 @@ function generateObstacles() {
 let obstacles = generateObstacles();
 
 const buildings = [
-  new Building(400, 200, 60, 150),
-  new Building(150, 500, 70, 90),
-  new Building(600, 200, 100, 150),
-  new Building(700, 450, 55, 110)
+  new Building(300, 15, 60, 90, '#8e44ad'),
+  new Building(660, 25, 55, 90, '#c0392b'),
+  new Building(400, 210, 60, 90, '#8e44ad'),
+  new Building(400, 385, 55, 90, '#c0392b'),
+  new Building(650, 380, 55, 85, '#27ae60'),
 ];
 
+const houses = [
+  new House(30, 60, 45, '#c0392b'),
+  new House(120, 80, 40, '#e67e22'),
+  new House(420, 60, 40, '#e67e22'),
+  new House(600, 60, 40, '#27ae60'),
+  new House(300, 250, 40, '#c0392b'),
+  new House(650, 250, 45, '#e67e22'),
+  new House(60, 400, 45, '#c0392b'),
+  new House(150, 420, 40, '#27ae60'),
+  new House(470, 410, 40, '#e67e22'),
+  new House(730, 400, 40, '#c0392b'),
+];
+
+function generateDeliveryTarget() {
+  return new DeliveryTarget(
+    Math.random() * (canvas.width - 100) + 50,
+    Math.random() * (canvas.height - 100) + 50
+  );
+}
+
+let deliveryTarget = generateDeliveryTarget();
+let deliveriesCompleted = 0;
+const deliveryCountDisplay = document.getElementById('deliveryCount');
+
 let loadSheddingTimer = 0;
-const loadSheddingCycle = 8; // seconds on/off for charging station
+const loadSheddingCycle = 8;
 
 // ==========================
 // Input tracking
@@ -254,6 +435,18 @@ document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('resumeBtn').addEventListener('click', resumeGame);
 document.getElementById('restartBtn').addEventListener('click', restartGame);
 
+// ==========================
+// Background music
+// ==========================
+const bgMusic = document.getElementById('bgMusic');
+const volumeSlider = document.getElementById('volumeSlider');
+
+bgMusic.volume = volumeSlider.value / 100;
+
+volumeSlider.addEventListener('input', () => {
+  bgMusic.volume = volumeSlider.value / 100;
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.key === 'p' || e.key === 'P') {
     if (gameState === 'playing') pauseGame();
@@ -264,7 +457,7 @@ window.addEventListener('keydown', (e) => {
 // ==========================
 // Game objects
 // ==========================
-const drone = new Vehicle(100, 250);
+const drone = new Vehicle(30, 250);
 
 // ==========================
 // Game loop
@@ -314,6 +507,11 @@ function update(deltaTime) {
     }
   });
 
+  if (isColliding(drone, deliveryTarget)) {
+  deliveriesCompleted++;
+  deliveryTarget = generateDeliveryTarget();
+}
+
   // Buildings block movement entirely
   buildings.forEach(building => {
     if (isCollidingWithBuilding(drone, building)) {
@@ -329,15 +527,18 @@ function update(deltaTime) {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drone.draw(ctx);
+  drawRoads(ctx);
+  treePositions.forEach(([x, y]) => drawTree(ctx, x, y));
 
   buildings.forEach(building => building.draw(ctx));
+  houses.forEach(house => house.draw(ctx));
   obstacles.forEach(obstacle => obstacle.draw(ctx));
+  drone.draw(ctx);
+  deliveryTarget.draw(ctx);
 
-  // Sync the HTML HUD (not drawn on canvas - cleaner separation)
+  deliveryCountDisplay.textContent = deliveriesCompleted;
   batteryDisplay.textContent = Math.floor(drone.batteryLevel);
   distanceDisplay.textContent = Math.floor(distanceTravelled);
-
   batteryCard.classList.toggle('low-battery', drone.batteryLevel < 20);
 }
 
