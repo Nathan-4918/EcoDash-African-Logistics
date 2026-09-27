@@ -10,6 +10,7 @@ const batteryCard = batteryDisplay.closest('.hud-card');
 
 let lastTime = 0;
 let distanceTravelled = 0;
+let windVisuals = [];
 
 // ==========================
 // Game state & scoring
@@ -91,7 +92,8 @@ class Vehicle {
     this.radius = 15;
     this.angle = 0;           // direction, in radians
     this.speed = 0;
-    this.maxSpeed = 120;      // pixels per second
+    this.maxSpeed = 120;
+    this.acceleration = 200;      // pixels per second
     this.batteryLevel = 100;
     this.drainRate = 5;       // % per second while moving
   }
@@ -105,9 +107,9 @@ if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier
 
     // Accelerate forward, only if there's battery left
     if (keysPressed['ArrowUp'] && this.batteryLevel > 0) {
-      this.speed = this.maxSpeed;
+  this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * deltaTime);
     } else {
-      this.speed = 0;
+      this.speed = Math.max(0, this.speed - this.acceleration * deltaTime);
     }
 
     // Trig-based movement: angle + speed -> x/y direction
@@ -165,7 +167,8 @@ class Obstacle {
 
     let label = '';
     if (this.type === 'windGust') {
-      context.fillStyle = 'rgba(174, 214, 241, 0.5)';
+      // MODIFIED: Make it a faint clear outline so particles take center stage
+      context.fillStyle = 'rgba(174, 214, 241, 0.15)'; 
       label = 'WIND';
     } else if (this.type === 'noFlyZone') {
       context.fillStyle = 'rgba(231, 76, 60, 0.45)';
@@ -179,7 +182,8 @@ class Obstacle {
     }
 
     context.fill();
-    context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+    // MODIFIED: Wind zone gets a cool matching blue border, others keep the dark overlay border
+    context.strokeStyle = this.type === 'windGust' ? 'rgba(52, 152, 219, 0.4)' : 'rgba(0, 0, 0, 0.4)';
     context.lineWidth = 2;
     context.stroke();
 
@@ -191,6 +195,7 @@ class Obstacle {
     context.fillText(label, this.x, this.y);
   }
 }
+
 
 // ==========================
 // Delivery Target (the mission objective)
@@ -384,8 +389,30 @@ function generateObstacles() {
 
   generated.push(new Obstacle(140, 260, 45, 'chargingStation'));
 
+  // Find the wind zone and scatter the lines all over the interior circle area
+  const windZone = generated.find(obs => obs.type === 'windGust');
+  if (windZone) {
+    windVisuals = []; 
+    
+    // Increased particle count to 35 so the entire circle area looks busy and populated!
+    for (let i = 0; i < 35; i++) {
+      // Pick a random angle and a random distance inside the boundary radius
+      let randomAngle = Math.random() * Math.PI * 2;
+      let randomRadius = Math.random() * windZone.radius;
+
+      windVisuals.push({
+        x: windZone.x + Math.cos(randomAngle) * randomRadius,
+        y: windZone.y + Math.sin(randomAngle) * randomRadius,
+        length: Math.random() * 15 + 10,
+        speed: Math.random() * 1.2 + 1.8 
+      });
+    }
+  }
+
   return generated;
 }
+
+
 
 let obstacles = generateObstacles();
 
@@ -459,6 +486,8 @@ window.addEventListener('keydown', (e) => {
 // ==========================
 const drone = new Vehicle(30, 250);
 
+let engineFXParticles = [];
+
 // ==========================
 // Game loop
 // ==========================
@@ -473,7 +502,46 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
+// ==========================
+// Wind Visual Particles Update
+// ==========================
+function updateWindZoneEffect() {
+  const windZone = obstacles.find(obs => obs.type === 'windGust');
+  if (!windZone) return;
+
+  windVisuals.forEach(streak => {
+    // 1. Move the streak along the wind direction angle
+    streak.x += Math.cos(windZone.windAngle) * streak.speed;
+    streak.y += Math.sin(windZone.windAngle) * streak.speed;
+
+    // 2. Calculate the distance from the center of the wind zone circle
+    let dx = streak.x - windZone.x;
+    let dy = streak.y - windZone.y;
+    let distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
+
+    // 3. If the streak leaves the boundary, scatter it uniquely on the incoming rim
+    if (distanceFromCenter > windZone.radius) {
+      // Pick a random angle facing the incoming wind direction (adds a 180-degree spread)
+      // This completely stops them from funneling into a single straight line!
+      let incomingSpreadAngle = windZone.windAngle + Math.PI + (Math.random() - 0.5) * Math.PI;
+      
+      // Place the particle on the edge of the circle using this new scattered entry angle
+      // We scale it down slightly to 0.95 so it spawns just inside the boundary ring
+      streak.x = windZone.x + Math.cos(incomingSpreadAngle) * (windZone.radius * 0.95);
+      streak.y = windZone.y + Math.sin(incomingSpreadAngle) * (windZone.radius * 0.95);
+      
+      // Give it a fresh random speed so particles break apart from each other
+      streak.speed = Math.random() * 1.2 + 1.8;
+      streak.length = Math.random() * 15 + 10;
+    }
+  });
+}
+
+
+
+
 function update(deltaTime) {
+  if (gameState !== 'playing') return;
   // Check if drone is currently inside a signal dead zone (affects control before moving)
   let controlMultiplier = 1;
   obstacles.forEach(obstacle => {
@@ -483,6 +551,9 @@ function update(deltaTime) {
   });
 
   drone.update(deltaTime, keysPressed, controlMultiplier);
+  
+  // NEW: Call the wind visual update right here!
+  updateWindZoneEffect();
 
   // Load-shedding cycle
   loadSheddingTimer += deltaTime;
@@ -498,8 +569,8 @@ function update(deltaTime) {
     if (!isColliding(drone, obstacle)) return;
 
     if (obstacle.type === 'windGust') {
-      drone.x += Math.cos(obstacle.windAngle) * 40 * deltaTime;
-      drone.y += Math.sin(obstacle.windAngle) * 40 * deltaTime;
+      drone.x += Math.cos(obstacle.windAngle) * 80 * deltaTime;
+      drone.y += Math.sin(obstacle.windAngle) * 80 * deltaTime;
     } else if (obstacle.type === 'noFlyZone') {
       drone.batteryLevel = Math.max(0, drone.batteryLevel - 10 * deltaTime); // penalty for restricted airspace
     } else if (obstacle.type === 'chargingStation' && obstacle.active) {
@@ -508,9 +579,9 @@ function update(deltaTime) {
   });
 
   if (isColliding(drone, deliveryTarget)) {
-  deliveriesCompleted++;
-  deliveryTarget = generateDeliveryTarget();
-}
+    deliveriesCompleted++;
+    deliveryTarget = generateDeliveryTarget();
+  }
 
   // Buildings block movement entirely
   buildings.forEach(building => {
@@ -519,10 +590,12 @@ function update(deltaTime) {
       drone.y = drone.prevY;
     }
   });
+  
   if (drone.batteryLevel <= 0 && gameState === 'playing') {
     endGame();
   }
 }
+
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -533,6 +606,25 @@ function render() {
   buildings.forEach(building => building.draw(ctx));
   houses.forEach(house => house.draw(ctx));
   obstacles.forEach(obstacle => obstacle.draw(ctx));
+  
+  // NEW: Draw the clean wind streaks inside the wind circle
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Faint wind current color
+  ctx.lineWidth = 1.5;
+  
+  windVisuals.forEach(streak => {
+    ctx.beginPath();
+    ctx.moveTo(streak.x, streak.y);
+    
+    // Angling the line streaks to point in the direction the wind pushes
+    const windZone = obstacles.find(obs => obs.type === 'windGust');
+    const angle = windZone ? windZone.windAngle : 0;
+    
+    ctx.lineTo(streak.x + Math.cos(angle) * streak.length, streak.y + Math.sin(angle) * streak.length);
+    ctx.stroke();
+  });
+  ctx.restore();
+
   drone.draw(ctx);
   deliveryTarget.draw(ctx);
 
@@ -541,5 +633,6 @@ function render() {
   distanceDisplay.textContent = Math.floor(distanceTravelled);
   batteryCard.classList.toggle('low-battery', drone.batteryLevel < 20);
 }
+
 
 requestAnimationFrame(gameLoop);
