@@ -1,4 +1,3 @@
-// ==========================
 // EcoDash - Core Setup
 // ==========================
 const canvas = document.getElementById('gameCanvas');
@@ -12,11 +11,11 @@ let lastTime = 0;
 let distanceTravelled = 0;
 let windVisuals = [];
 
-// ==========================
+
 // Game state & scoring
 // ==========================
-let gameState = 'start'; // 'start', 'playing', 'paused', 'gameover'
-let totalEnergyUsed = 0; // tracks drain only, not recharge - used for efficiency
+let gameState = 'start'; 
+let totalEnergyUsed = 0; 
 
 let highScore = localStorage.getItem('ecoDashHighScore');
 highScore = highScore ? parseInt(highScore) : 0;
@@ -81,7 +80,7 @@ function restartGame() {
   gameState = 'playing';
 }
 
-// ==========================
+
 // Vehicle Class (the player)
 // ==========================
 class Vehicle {
@@ -90,44 +89,39 @@ class Vehicle {
     this.x = x;
     this.y = y;
     this.radius = 15;
-    this.angle = 0;           // direction, in radians
+    this.angle = 0;        
     this.speed = 0;
     this.maxSpeed = 120;
-    this.acceleration = 200;      // pixels per second
+    this.acceleration = 200;    
     this.batteryLevel = 100;
-    this.drainRate = 5;       // % per second while moving
+    this.drainRate = 5;      
   }
 
   update(deltaTime, keysPressed, controlMultiplier = 1) {
      this.prevX = this.x;
      this.prevY = this.y;
-    // Rotate left/right
     if (keysPressed['ArrowLeft']) this.angle -= 2.5 * deltaTime * controlMultiplier;
 if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier;
 
-    // Accelerate forward, only if there's battery left
     if (keysPressed['ArrowUp'] && this.batteryLevel > 0) {
   this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * deltaTime);
     } else {
       this.speed = Math.max(0, this.speed - this.acceleration * deltaTime);
     }
 
-    // Trig-based movement: angle + speed -> x/y direction
     const moveX = Math.cos(this.angle) * this.speed * deltaTime;
     const moveY = Math.sin(this.angle) * this.speed * deltaTime;
     this.x += moveX;
     this.y += moveY;
 
-    // Track distance travelled (for the score system later)
     if (this.speed > 0) {
   distanceTravelled += Math.sqrt(moveX * moveX + moveY * moveY);
   const drain = this.drainRate * deltaTime;
   this.batteryLevel -= drain;
   this.batteryLevel = Math.max(0, this.batteryLevel);
-  totalEnergyUsed += drain; // NEW - tracks total drain for efficiency score
+  totalEnergyUsed += drain; 
 }
 
-    // Keep the drone inside the canvas
     this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
     this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
   }
@@ -147,7 +141,6 @@ if (keysPressed['ArrowRight']) this.angle += 2.5 * deltaTime * controlMultiplier
   }
 }
 
-// ==========================
 // Circular Obstacle Class
 // ==========================
 
@@ -167,7 +160,6 @@ class Obstacle {
 
     let label = '';
     if (this.type === 'windGust') {
-      // MODIFIED: Make it a faint clear outline so particles take center stage
       context.fillStyle = 'rgba(174, 214, 241, 0.15)'; 
       label = 'WIND';
     } else if (this.type === 'noFlyZone') {
@@ -182,12 +174,10 @@ class Obstacle {
     }
 
     context.fill();
-    // MODIFIED: Wind zone gets a cool matching blue border, others keep the dark overlay border
     context.strokeStyle = this.type === 'windGust' ? 'rgba(52, 152, 219, 0.4)' : 'rgba(0, 0, 0, 0.4)';
     context.lineWidth = 2;
     context.stroke();
 
-    // Label text, centered
     context.fillStyle = '#1a1a1a';
     context.font = 'bold 12px Arial';
     context.textAlign = 'center';
@@ -197,7 +187,7 @@ class Obstacle {
 }
 
 
-// ==========================
+
 // Delivery Target (the mission objective)
 // ==========================
 class DeliveryTarget {
@@ -224,7 +214,6 @@ class DeliveryTarget {
   }
 }
 
-  // ==========================
 // Building Class (solid, rectangular)
 // ==========================
 class Building {
@@ -233,7 +222,7 @@ class Building {
     this.y = y;
     this.width = width;
     this.height = height;
-    this.roofColor = roofColor || '#c0392b'; // default roof colour, can vary per building
+    this.roofColor = roofColor || '#c0392b'; 
   }
 
   draw(context) {
@@ -243,11 +232,9 @@ class Building {
     context.strokeStyle = '#2c2c2c';
     context.strokeRect(this.x, this.y, this.width, this.height);
 
-    // Roof strip along the top
     context.fillStyle = this.roofColor;
     context.fillRect(this.x, this.y, this.width, 10);
 
-    // Windows - simple grid of small squares
     context.fillStyle = 'rgba(255, 240, 150, 0.8)';
     const windowSize = 8;
     const gap = 14;
@@ -259,7 +246,6 @@ class Building {
   }
 }
 
-// ==========================
 // House Class (small, decorative only - no collision)
 // ==========================
 class House {
@@ -273,13 +259,11 @@ class House {
   draw(context) {
     const s = this.size;
 
-    // Walls
     context.fillStyle = '#d8c9a3';
     context.fillRect(this.x, this.y + s * 0.4, s, s * 0.6);
     context.strokeStyle = '#2c2c2c';
     context.strokeRect(this.x, this.y + s * 0.4, s, s * 0.6);
 
-    // Triangular roof
     context.fillStyle = this.roofColor;
     context.beginPath();
     context.moveTo(this.x - s * 0.1, this.y + s * 0.4);
@@ -289,20 +273,18 @@ class House {
     context.fill();
     context.stroke();
 
-    // Door
     context.fillStyle = '#5c3a21';
     context.fillRect(this.x + s * 0.4, this.y + s * 0.75, s * 0.2, s * 0.25);
   }
 }
 
-// ==========================
 // Decorative trees (visual only - no collision)
 // ==========================
 function drawTree(context, x, y) {
-  context.fillStyle = '#5c3a21'; // trunk
+  context.fillStyle = '#5c3a21'; 
   context.fillRect(x - 3, y, 6, 14);
 
-  context.fillStyle = '#2e6b3e'; // leaves
+  context.fillStyle = '#2e6b3e'; 
   context.beginPath();
   context.arc(x, y - 4, 12, 0, Math.PI * 2);
   context.fill();
@@ -319,7 +301,7 @@ function drawRoads(context) {
   const horizontalRoads = [170, 350];
   const verticalRoads = [270, 530];
 
-  context.fillStyle = '#0d0d0d'; // black asphalt
+  context.fillStyle = '#0d0d0d'; 
 
   horizontalRoads.forEach(y => {
     context.fillRect(0, y - roadWidth / 2, canvas.width, roadWidth);
@@ -348,11 +330,9 @@ function drawRoads(context) {
   context.setLineDash([]);
 }
 
-// ==========================
 // Collision detection
 // ==========================
 
-// Circle vs circle (drone vs wind/no-fly/dead-zone/charging station)
 function isColliding(a, b){
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -360,7 +340,6 @@ function isColliding(a, b){
   return distance < a.radius + b.radius;
 }
 
-// Circle vs rectangle (drone vs building) - AABB-style check
 function isCollidingWithBuilding(circle, rect){
   const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
   const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
@@ -371,7 +350,6 @@ function isCollidingWithBuilding(circle, rect){
   return (dx * dx + dy * dy) < (circle.radius * circle.radius);
 }
 
-// ==========================
 // Obstacles, Buildings & Load-shedding
 // ==========================
 function generateObstacles() {
@@ -389,14 +367,11 @@ function generateObstacles() {
 
   generated.push(new Obstacle(140, 260, 45, 'chargingStation'));
 
-  // Find the wind zone and scatter the lines all over the interior circle area
   const windZone = generated.find(obs => obs.type === 'windGust');
   if (windZone) {
     windVisuals = []; 
     
-    // Increased particle count to 35 so the entire circle area looks busy and populated!
     for (let i = 0; i < 35; i++) {
-      // Pick a random angle and a random distance inside the boundary radius
       let randomAngle = Math.random() * Math.PI * 2;
       let randomRadius = Math.random() * windZone.radius;
 
@@ -451,7 +426,6 @@ const deliveryCountDisplay = document.getElementById('deliveryCount');
 let loadSheddingTimer = 0;
 const loadSheddingCycle = 8;
 
-// ==========================
 // Input tracking
 // ==========================
 const keysPressed = {};
@@ -462,7 +436,6 @@ document.getElementById('startBtn').addEventListener('click', startGame);
 document.getElementById('resumeBtn').addEventListener('click', resumeGame);
 document.getElementById('restartBtn').addEventListener('click', restartGame);
 
-// ==========================
 // Background music
 // ==========================
 const bgMusic = document.getElementById('bgMusic');
@@ -481,14 +454,12 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// ==========================
 // Game objects
 // ==========================
 const drone = new Vehicle(30, 250);
 
 let engineFXParticles = [];
 
-// ==========================
 // Game loop
 // ==========================
 function gameLoop(timestamp) {
@@ -502,7 +473,6 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-// ==========================
 // Wind Visual Particles Update
 // ==========================
 function updateWindZoneEffect() {
@@ -510,27 +480,19 @@ function updateWindZoneEffect() {
   if (!windZone) return;
 
   windVisuals.forEach(streak => {
-    // 1. Move the streak along the wind direction angle
     streak.x += Math.cos(windZone.windAngle) * streak.speed;
     streak.y += Math.sin(windZone.windAngle) * streak.speed;
 
-    // 2. Calculate the distance from the center of the wind zone circle
     let dx = streak.x - windZone.x;
     let dy = streak.y - windZone.y;
     let distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
 
-    // 3. If the streak leaves the boundary, scatter it uniquely on the incoming rim
     if (distanceFromCenter > windZone.radius) {
-      // Pick a random angle facing the incoming wind direction (adds a 180-degree spread)
-      // This completely stops them from funneling into a single straight line!
       let incomingSpreadAngle = windZone.windAngle + Math.PI + (Math.random() - 0.5) * Math.PI;
       
-      // Place the particle on the edge of the circle using this new scattered entry angle
-      // We scale it down slightly to 0.95 so it spawns just inside the boundary ring
       streak.x = windZone.x + Math.cos(incomingSpreadAngle) * (windZone.radius * 0.95);
       streak.y = windZone.y + Math.sin(incomingSpreadAngle) * (windZone.radius * 0.95);
       
-      // Give it a fresh random speed so particles break apart from each other
       streak.speed = Math.random() * 1.2 + 1.8;
       streak.length = Math.random() * 15 + 10;
     }
@@ -542,20 +504,17 @@ function updateWindZoneEffect() {
 
 function update(deltaTime) {
   if (gameState !== 'playing') return;
-  // Check if drone is currently inside a signal dead zone (affects control before moving)
   let controlMultiplier = 1;
   obstacles.forEach(obstacle => {
     if (obstacle.type === 'signalDeadZone' && isColliding(drone, obstacle)) {
-      controlMultiplier = 0.3; // rotation becomes sluggish
+      controlMultiplier = 0.3; 
     }
   });
 
   drone.update(deltaTime, keysPressed, controlMultiplier);
   
-  // NEW: Call the wind visual update right here!
   updateWindZoneEffect();
 
-  // Load-shedding cycle
   loadSheddingTimer += deltaTime;
   if (loadSheddingTimer >= loadSheddingCycle) {
     loadSheddingTimer = 0;
@@ -564,7 +523,6 @@ function update(deltaTime) {
     });
   }
 
-  // Handle each obstacle type
   obstacles.forEach(obstacle => {
     if (!isColliding(drone, obstacle)) return;
 
@@ -572,7 +530,7 @@ function update(deltaTime) {
       drone.x += Math.cos(obstacle.windAngle) * 80 * deltaTime;
       drone.y += Math.sin(obstacle.windAngle) * 80 * deltaTime;
     } else if (obstacle.type === 'noFlyZone') {
-      drone.batteryLevel = Math.max(0, drone.batteryLevel - 10 * deltaTime); // penalty for restricted airspace
+      drone.batteryLevel = Math.max(0, drone.batteryLevel - 10 * deltaTime); 
     } else if (obstacle.type === 'chargingStation' && obstacle.active) {
       drone.batteryLevel = Math.min(100, drone.batteryLevel + 20 * deltaTime);
     }
@@ -583,7 +541,6 @@ function update(deltaTime) {
     deliveryTarget = generateDeliveryTarget();
   }
 
-  // Buildings block movement entirely
   buildings.forEach(building => {
     if (isCollidingWithBuilding(drone, building)) {
       drone.x = drone.prevX;
@@ -607,16 +564,14 @@ function render() {
   houses.forEach(house => house.draw(ctx));
   obstacles.forEach(obstacle => obstacle.draw(ctx));
   
-  // NEW: Draw the clean wind streaks inside the wind circle
   ctx.save();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Faint wind current color
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; 
   ctx.lineWidth = 1.5;
   
   windVisuals.forEach(streak => {
     ctx.beginPath();
     ctx.moveTo(streak.x, streak.y);
     
-    // Angling the line streaks to point in the direction the wind pushes
     const windZone = obstacles.find(obs => obs.type === 'windGust');
     const angle = windZone ? windZone.windAngle : 0;
     
